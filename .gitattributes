@@ -1,0 +1,2 @@
+# Git refuses to apply patches with Windows line endings
+*.patch binary
