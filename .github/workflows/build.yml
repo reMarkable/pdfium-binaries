@@ -29,17 +29,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - run: |
-          echo "PDFium_V8=disabled" >> $GITHUB_ENV
+      - name: Release build without V8, ${{ matrix.chromium_version }}
+        run: |
           echo "PDFium_BRANCH=${{ matrix.chromium_version }}" >> $GITHUB_ENV
+          echo "PDFium_V8=disabled" >> $GITHUB_ENV
           echo "CONFIGURATION=Release" >> $GITHUB_ENV
         shell: bash
 
-      # Windows stuff
-      # Could also build x64 in addition...
-      - run: Write-Host "PLATFORM=x86" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        if: runner.os == 'Windows'
-      - run: Write-Host "GYP_MSVS_VERSION=2019" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Windows env
+        run: |
+          Write-Host "PLATFORM=x86" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "GYP_MSVS_VERSION=2019" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         if: runner.os == 'Windows'
 
       - run: |
@@ -56,4 +56,3 @@ jobs:
         with:
           name: pdfium-prebuilt
           path: pdfium-*.*
-
