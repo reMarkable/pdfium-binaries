@@ -23,7 +23,7 @@ jobs:
         # git checkout "chromium/$(curl https://omahaproxy.appspot.com/linux?channel=stable | cut -d'.' -f 3)"
         # git checkout "chromium/$(curl https://omahaproxy.appspot.com/linux?channel=beta | cut -d'.' -f 3)"
         # git checkout "chromium/$(curl https://omahaproxy.appspot.com/linux?channel=dev | cut -d'.' -f 3)"
-        chromium_version: ["chromium/4283"]
+        chromium_version: ["chromium/4193"]
 
     continue-on-error: true
 
