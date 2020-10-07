@@ -28,6 +28,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 2.7
 
       - name: Release build without V8, ${{ matrix.chromium_version }}
         run: |
