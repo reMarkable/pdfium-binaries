@@ -14,8 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: ["ubuntu-20.04", "windows-2019"]
-        # os: ["ubuntu-20.04", "windows-2019", [self-hosted, macOS, X64]]
+        os: ["ubuntu-20.04", "windows-2019", [self-hosted, macOS, X64]]
         # Pdfium is developed alongside Chromium and does not provide releases
         # Upstream recommends using Chromium's dev channels instead
         # Extract pdfium branch name used in stable channel from omahaproxy and do
