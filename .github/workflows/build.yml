@@ -50,9 +50,11 @@ jobs:
         if: runner.os == 'Windows'
 
       - run: |
-          ./build.sh
+          bash build.sh
         if: runner.os != 'Windows'
 
-# artifacts:
-#   - path: pdfium-*.zip
-#     name: PDFium library
+      - uses: actions/upload-artifact@v2
+        with:
+          name: pdfium-prebuilt
+          path: pdfium-*.*
+
