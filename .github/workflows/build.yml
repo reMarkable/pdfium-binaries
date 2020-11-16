@@ -1,0 +1,51 @@
+
+name: Build
+on:
+  push:
+    branches:
+    - 'master'
+  pull_request:
+    branches:
+    - '**'
+
+jobs:
+  build:
+    name: build
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      matrix:
+        os: ["ubuntu-20.04", "windows-2019", [self-hosted, macOS, X64]]
+        # Pdfium is developed alongside Chromium and does not provide releases
+        # Upstream recommends using Chromium's dev channels instead
+        # Extract pdfium branch name used in stable channel from omahaproxy and do
+        # a checkout
+        # git checkout "chromium/$(curl https://omahaproxy.appspot.com/linux?channel=stable | cut -d'.' -f 3)"
+        # git checkout "chromium/$(curl https://omahaproxy.appspot.com/linux?channel=beta | cut -d'.' -f 3)"
+        # git checkout "chromium/$(curl https://omahaproxy.appspot.com/linux?channel=dev | cut -d'.' -f 3)"
+        chromium_version: ["chromium/4320"]
+
+    steps:
+      - uses: actions/checkout@v2
+      - run: echo "PDFium_BRANCH=${{ matrix.chromium_version }}" >> $GITHUB_ENV
+      - run: echo "PDFium_V8=disabled" >> $GITHUB_ENV
+      - run: echo "CONFIGURATION=Release" >> $GITHUB_ENV
+
+      - name: build linux/macos
+        run: ./build.sh
+        if: runner.os != 'Windows'
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+        with:
+          arch: amd64_x86
+
+      - name: build windows
+        run: ./build.bat
+        if: runner.os == 'Windows'
+
+      - name: Save artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: pdfium-${{ runner.os }}
+          path: ./pdfium-*.*
