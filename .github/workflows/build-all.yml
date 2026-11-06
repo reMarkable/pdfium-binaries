@@ -29,6 +29,72 @@ on:
         default: false
 
 jobs:
+  android_arm:
+    name: Android ARM
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: android
+      target_cpu: arm
+
+  android_arm64:
+    name: Android ARM64
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: android
+      target_cpu: arm64
+
+  android_x64:
+    name: Android x64
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: android
+      target_cpu: x64
+
+  android_x86:
+    name: Android x86
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: android
+      target_cpu: x86
+
+  ios_device_arm64:
+    name: iOS device ARM64
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: ios
+      target_cpu: arm64
+      target_environment: device
+
   linux_arm:
     name: Linux ARM
     permissions:
@@ -55,6 +121,19 @@ jobs:
       target_os: linux
       target_cpu: arm64
 
+  linux_x64:
+    name: Linux x64
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: linux
+      target_cpu: x64
+
   linux_x86:
     name: Linux x86
     permissions:
@@ -68,6 +147,71 @@ jobs:
       target_os: linux
       target_cpu: x86
 
+  mac_arm64:
+    name: macOS ARM64
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: mac
+      target_cpu: arm64
+
+  mac_x64:
+    name: macOS x64
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: mac
+      target_cpu: x64
+
+  win_x64:
+    name: Windows x64
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: win
+      target_cpu: x64
+
+  win_x86:
+    name: Windows x86
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: win
+      target_cpu: x86
+
+  mac_univ:
+    name: macOS univ
+    needs:
+      - mac_arm64
+      - mac_x64
+    permissions:
+      contents: read
+      actions: write # Download/upload workflow artifacts
+    uses: ./.github/workflows/mac-univ.yml
+    with:
+      artifact_x64: ${{ needs.mac_x64.outputs.artifact }}
+      artifact_arm64: ${{ needs.mac_arm64.outputs.artifact }}
+
   publish:
     name: Publish Release
     outputs:
@@ -76,9 +220,20 @@ jobs:
     if: startsWith(github.event.inputs.branch, 'chromium/') && github.event.inputs.version && github.event.inputs.release == 'true'
     runs-on: ubuntu-latest
     needs:
+      - android_arm
+      - android_arm64
+      - android_x64
+      - android_x86
+      - ios_device_arm64
       - linux_arm
       - linux_arm64
+      - linux_x64
       - linux_x86
+      - mac_arm64
+      - mac_univ
+      - mac_x64
+      - win_x64
+      - win_x86
     permissions:
       contents: write # to create releases
       id-token: write # to attest build provenance
