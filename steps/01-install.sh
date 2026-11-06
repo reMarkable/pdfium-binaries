@@ -41,7 +41,7 @@ case "$TARGET_OS" in
 
   linux)
     sudo apt-get update
-    sudo apt-get install -y cmake pkg-config
+    sudo apt-get install -y --no-install-recommends cmake pkg-config
 
     if [ "$TARGET_ENVIRONMENT" == "musl" ]; then
 
@@ -70,17 +70,17 @@ case "$TARGET_OS" in
       [ -d "$MUSL_VERSION" ] || curl -sfL "$MUSL_URL/$MUSL_VERSION.tgz" | tar xz
       echo "$PWD/$MUSL_VERSION/bin" >> "$PATH_FILE"
 
-      sudo apt-get install -y $PACKAGES
+      sudo apt-get install -y --no-install-recommends $PACKAGES
 
     else # i.e. not musl
 
       case "$TARGET_CPU" in
         arm)
-          sudo apt-get install -y libc6-i386 gcc-10-multilib g++-10-arm-linux-gnueabihf gcc-10-arm-linux-gnueabihf
+          sudo apt-get install -y --no-install-recommends libc6-i386 gcc-10-multilib g++-10-arm-linux-gnueabihf gcc-10-arm-linux-gnueabihf
           ;;
 
         arm64)
-          sudo apt-get install -y libc6-i386 gcc-10-multilib g++-10-aarch64-linux-gnu gcc-10-aarch64-linux-gnu
+          sudo apt-get install -y --no-install-recommends libc6-i386 gcc-10-multilib g++-10-aarch64-linux-gnu gcc-10-aarch64-linux-gnu
           ;;
 
         mipsel)
@@ -108,11 +108,11 @@ case "$TARGET_OS" in
           ;;
 
         x86)
-          sudo apt-get install -y g++-multilib
+          sudo apt-get install -y --no-install-recommends g++-multilib
           ;;
 
         x64)
-          sudo apt-get install -y g++
+          sudo apt-get install -y --no-install-recommends g++
           ;;
       esac
 
