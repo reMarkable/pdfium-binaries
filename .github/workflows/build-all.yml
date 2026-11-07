@@ -95,6 +95,34 @@ jobs:
       target_cpu: arm64
       target_environment: device
 
+  ios_simulator_arm64:
+    name: iOS simulator ARM64
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: ios
+      target_cpu: arm64
+      target_environment: simulator
+
+  ios_simulator_x64:
+    name: iOS simulator x64
+    permissions:
+      contents: read
+      actions: write # Upload workflow artifacts
+    uses: ./.github/workflows/build.yml
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      version: ${{ github.event.inputs.version }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+      target_os: ios
+      target_cpu: x64
+      target_environment: simulator
+
   linux_arm:
     name: Linux ARM
     permissions:
@@ -225,6 +253,8 @@ jobs:
       - android_x64
       - android_x86
       - ios_device_arm64
+      - ios_simulator_arm64
+      - ios_simulator_x64
       - linux_arm
       - linux_arm64
       - linux_x64
