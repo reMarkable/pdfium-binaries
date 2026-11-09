@@ -1,0 +1,178 @@
+From 250f5dada1fb1c0cf552fc85e4dd891dede8c985 Mon Sep 17 00:00:00 2001
+From: Lei Zhang <thestig@chromium.org>
+Date: Mon, 26 Oct 2026 18:44:10 -0700
+Subject: [PATCH] Write single-subsection non-incremental xref tables in CPDF_Creator
+
+The pre-existing CPDF_Creator::WriteDoc_Stage3() skips unused object
+numbers in `object_offsets_` and split non-incremental cross-reference
+tables into multiple subsections around gaps. This technically violates
+the spec. Update it to emit a single xref section for objects 0 to
+`last_obj_num_` for non-incremental cross-reference tables, writing
+`65535 f` free entries linked in ascending order and terminating back at
+object 0. Also format file offsets as `long long` with `%010lld` instead
+of passing `FX_FILESIZE` to `%010d`.
+
+Then update the CPDFCreatorEmbedderTest test case to verify the single
+subsection header and free-object linked list.
+
+This CL is AI generated.
+
+Bug: 42271313
+Change-Id: I305a8b1ace3199420d8fa2a2ac08bb691c03e217
+---
+
+diff --git a/core/fpdfapi/edit/cpdf_creator.cpp b/core/fpdfapi/edit/cpdf_creator.cpp
+index 31e004f..e8e6a0e 100644
+--- a/core/fpdfapi/edit/cpdf_creator.cpp
++++ b/core/fpdfapi/edit/cpdf_creator.cpp
+@@ -345,70 +345,53 @@
+   DCHECK(stage_ >= Stage::kInitWriteXRefs80 ||
+          stage_ < Stage::kWriteTrailerAndFinish90);
+ 
+-  uint32_t dwLastObjNum = last_obj_num_;
+   if (stage_ == Stage::kInitWriteXRefs80) {
+     xref_start_ = archive_->CurrentOffset();
+     if (!is_incremental_ || !parser_->IsXRefStream()) {
+-      if (!is_incremental_ || parser_->GetLastXRefOffset() == 0) {
+-        ByteString str;
+-        str = pdfium::Contains(object_offsets_, 1)
+-                  ? "xref\r\n"
+-                  : "xref\r\n0 1\r\n0000000000 65535 f\r\n";
+-        if (!archive_->WriteString(str.AsStringView())) {
+-          return Stage::kInvalid;
+-        }
+-
+-        cur_obj_num_ = 1;
+-        stage_ = Stage::kWriteXrefsNotIncremental81;
+-      } else {
+-        if (!archive_->WriteString("xref\r\n")) {
+-          return Stage::kInvalid;
+-        }
+-
+-        cur_obj_num_ = 0;
+-        stage_ = Stage::kWriteXrefsIncremental82;
++      if (!archive_->WriteString("xref\r\n")) {
++        return Stage::kInvalid;
+       }
++
++      cur_obj_num_ = 0;
++      stage_ = (!is_incremental_ || parser_->GetLastXRefOffset() == 0)
++                   ? Stage::kWriteXrefsNotIncremental81
++                   : Stage::kWriteXrefsIncremental82;
+     } else {
+       stage_ = Stage::kWriteTrailerAndFinish90;
+     }
+   }
+   if (stage_ == Stage::kWriteXrefsNotIncremental81) {
+-    ByteString str;
+-    uint32_t i = cur_obj_num_;
+-    uint32_t j;
+-    while (i <= dwLastObjNum) {
+-      while (i <= dwLastObjNum && !pdfium::Contains(object_offsets_, i)) {
+-        i++;
+-      }
++    // Per ISO 32000-1:2008, section 7.5.4, a file that has never been
++    // incrementally updated shall contain only one subsection starting at
++    // object 0, with free entries forming a linked list starting and ending at
++    // object 0.
++    ByteString str = ByteString::Format("0 %u\r\n", last_obj_num_ + 1);
++    if (!archive_->WriteString(str.AsStringView())) {
++      return Stage::kInvalid;
++    }
+ 
+-      if (i > dwLastObjNum) {
+-        break;
+-      }
+-
+-      j = i;
+-      while (j <= dwLastObjNum && pdfium::Contains(object_offsets_, j)) {
+-        j++;
+-      }
+-
+-      if (i == 1) {
+-        str = ByteString::Format("0 %d\r\n0000000000 65535 f\r\n", j);
++    uint32_t next_free = 0;
++    for (uint32_t obj_num = cur_obj_num_; obj_num <= last_obj_num_; ++obj_num) {
++      const auto it =
++          obj_num > 0 ? object_offsets_.find(obj_num) : object_offsets_.end();
++      if (it != object_offsets_.end()) {
++        str = ByteString::Format("%010lld 00000 n\r\n",
++                                 static_cast<long long>(it->second));
+       } else {
+-        str = ByteString::Format("%d %d\r\n", i, j - i);
++        if (next_free <= obj_num) {
++          next_free = obj_num + 1;
++          while (next_free <= last_obj_num_ &&
++                 pdfium::Contains(object_offsets_, next_free)) {
++            ++next_free;
++          }
++        }
++        const uint32_t next_free_entry =
++            next_free <= last_obj_num_ ? next_free : 0;
++        str = ByteString::Format("%010u 65535 f\r\n", next_free_entry);
+       }
+-
+       if (!archive_->WriteString(str.AsStringView())) {
+         return Stage::kInvalid;
+       }
+-
+-      while (i < j) {
+-        str = ByteString::Format("%010d 00000 n\r\n", object_offsets_[i++]);
+-        if (!archive_->WriteString(str.AsStringView())) {
+-          return Stage::kInvalid;
+-        }
+-      }
+-      if (i > dwLastObjNum) {
+-        break;
+-      }
+     }
+     stage_ = Stage::kWriteTrailerAndFinish90;
+   }
+diff --git a/core/fpdfapi/edit/cpdf_creator_embeddertest.cpp b/core/fpdfapi/edit/cpdf_creator_embeddertest.cpp
+index a18c8c5..f8c9b1f 100644
+--- a/core/fpdfapi/edit/cpdf_creator_embeddertest.cpp
++++ b/core/fpdfapi/edit/cpdf_creator_embeddertest.cpp
+@@ -95,17 +95,18 @@
+ 
+   static constexpr char kExpectedXrefAndTrailerPrefix[] =
+       "xref\r\n"
+-      "0 1\r\n"
+-      "0000000000 65535 f\r\n"
+-      "2 1\r\n"
++      "0 8\r\n"
++      "0000000001 65535 f\r\n"
++      "0000000003 65535 f\r\n"
+       "0000000017 00000 n\r\n"
+-      "4 1\r\n"
++      "0000000005 65535 f\r\n"
+       "0000000066 00000 n\r\n"
+-      "7 1\r\n"
++      "0000000006 65535 f\r\n"
++      "0000000000 65535 f\r\n"
+       "0000000122 00000 n\r\n"
+-      "trailer\r\n";
++      "trailer\r\n"
++      "<</Root 2 0 R /Size 8/ID[<";
+ 
+-  // TODO(crbug.com/42271313): xref section should not have gaps.
+   EXPECT_THAT(GetString(), testing::HasSubstr(kExpectedXrefAndTrailerPrefix));
+ 
+   // Also make sure the saved PDF still loads.
+diff --git a/fpdfsdk/fpdf_save_embeddertest.cpp b/fpdfsdk/fpdf_save_embeddertest.cpp
+index 58b8174..8c2d798 100644
+--- a/fpdfsdk/fpdf_save_embeddertest.cpp
++++ b/fpdfsdk/fpdf_save_embeddertest.cpp
+@@ -166,11 +166,12 @@
+   EXPECT_THAT(GetString(), HasSubstr("/Root "));
+   EXPECT_THAT(GetString(), HasSubstr("/Info "));
+   EXPECT_THAT(GetString(), HasSubstr("/Size 37"));
++  EXPECT_THAT(GetString(), HasSubstr("xref\r\n0 37\r\n"));
+   EXPECT_THAT(GetString(), HasSubstr("35 0 obj"));
+   EXPECT_THAT(GetString(), HasSubstr("36 0 obj"));
+   EXPECT_THAT(GetString(), Not(HasSubstr("37 0 obj")));
+   EXPECT_THAT(GetString(), Not(HasSubstr("38 0 obj")));
+-  EXPECT_EQ(7884u, GetString().size());
++  EXPECT_EQ(7912u, GetString().size());
+ 
+   // Make sure new document renders the same as the old one.
+   ScopedSavedDoc saved_document = OpenScopedSavedDocument();

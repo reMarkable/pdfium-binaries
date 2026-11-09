@@ -1,0 +1,140 @@
+From 7a364ab9b0adb206bff584bd4884265fc91cce65 Mon Sep 17 00:00:00 2001
+From: Lei Zhang <thestig@chromium.org>
+Date: Tue, 27 Oct 2026 14:16:22 -0700
+Subject: [PATCH] Add CPDFCreatorEmbedderTest for handling free entries
+
+Per ISO 32000-1:2008 section 7.5.4, a PDF file that has never been
+incrementally updated shall contain only one cross-reference subsection
+starting at object 0, with free entries forming a linked list starting
+and ending at object 0. The pre-existing CPDF_Creator code does not
+behave this way. While most PDF readers tolerate the behavior, and it
+can make the xref smaller, it technically violates the spec.
+
+Add a new test case in CPDFCreatorEmbedderTest to check how free entries
+are currently being handled. Add xref_free_objects.pdf with some
+deliberate object number gaps for use in this test case.
+
+This CL is AI generated.
+
+Bug: 42271313
+Change-Id: Id84d0a6e01838c96b193b587c948ec904e045c24
+Reviewed-on: https://pdfium-review.googlesource.com/c/pdfium/+/162210
+Reviewed-by: Andy Phan <andyphan@chromium.org>
+Commit-Queue: Lei Zhang <thestig@chromium.org>
+---
+
+diff --git a/core/fpdfapi/edit/cpdf_creator_embeddertest.cpp b/core/fpdfapi/edit/cpdf_creator_embeddertest.cpp
+index 5d8836b..a18c8c5 100644
+--- a/core/fpdfapi/edit/cpdf_creator_embeddertest.cpp
++++ b/core/fpdfapi/edit/cpdf_creator_embeddertest.cpp
+@@ -88,3 +88,29 @@
+ 
+   EXPECT_THAT(saved_doc, ::testing::HasSubstr("/Info"));
+ }
++
++TEST_F(CPDFCreatorEmbedderTest, SingleSubsectionXrefWithFreeObjectLinkedList) {
++  ASSERT_TRUE(OpenDocument("xref_free_objects.pdf"));
++  ASSERT_TRUE(FPDF_SaveAsCopy(document(), this, 0));
++
++  static constexpr char kExpectedXrefAndTrailerPrefix[] =
++      "xref\r\n"
++      "0 1\r\n"
++      "0000000000 65535 f\r\n"
++      "2 1\r\n"
++      "0000000017 00000 n\r\n"
++      "4 1\r\n"
++      "0000000066 00000 n\r\n"
++      "7 1\r\n"
++      "0000000122 00000 n\r\n"
++      "trailer\r\n";
++
++  // TODO(crbug.com/42271313): xref section should not have gaps.
++  EXPECT_THAT(GetString(), testing::HasSubstr(kExpectedXrefAndTrailerPrefix));
++
++  // Also make sure the saved PDF still loads.
++  ScopedSavedDoc saved_document = OpenScopedSavedDocument();
++  ASSERT_TRUE(saved_document);
++  ScopedSavedPage saved_page = LoadScopedSavedPage(0);
++  EXPECT_TRUE(saved_page);
++}
+diff --git a/testing/resources/xref_free_objects.in b/testing/resources/xref_free_objects.in
+new file mode 100644
+index 0000000..f32b55f
+--- /dev/null
++++ b/testing/resources/xref_free_objects.in
+@@ -0,0 +1,29 @@
++{{header}}
++% Omit object 1 to test a free entry immediately following object 0.
++{{object 2 0}} <<
++  /Type /Catalog
++  /Pages 4 0 R
++>>
++endobj
++% Omit object 3 to test a single free entry between in-use objects.
++{{object 4 0}} <<
++  /Type /Pages
++  /Count 1
++  /Kids [7 0 R]
++>>
++endobj
++% Omit objects 5 and 6 to test consecutive free entries before the last
++% in-use object.
++{{object 7 0}} <<
++  /Type /Page
++  /Parent 4 0 R
++  /MediaBox [0 0 200 200]
++>>
++endobj
++{{xref}}
++trailer <<
++  /Root 2 0 R
++  {{trailersize}}
++>>
++{{startxref}}
++%%EOF
+diff --git a/testing/resources/xref_free_objects.pdf b/testing/resources/xref_free_objects.pdf
+new file mode 100644
+index 0000000..de685d1
+--- /dev/null
++++ b/testing/resources/xref_free_objects.pdf
+@@ -0,0 +1,40 @@
++%PDF-1.7
++% ò¤ô
++% Omit object 1 to test a free entry immediately following object 0.
++2 0 obj <<
++  /Type /Catalog
++  /Pages 4 0 R
++>>
++endobj
++% Omit object 3 to test a single free entry between in-use objects.
++4 0 obj <<
++  /Type /Pages
++  /Count 1
++  /Kids [7 0 R]
++>>
++endobj
++% Omit objects 5 and 6 to test consecutive free entries before the last
++% in-use object.
++7 0 obj <<
++  /Type /Page
++  /Parent 4 0 R
++  /MediaBox [0 0 200 200]
++>>
++endobj
++xref
++0 8
++0000000000 65535 f 
++0000000000 65535 f 
++0000000084 00000 n 
++0000000000 65535 f 
++0000000205 00000 n 
++0000000000 65535 f 
++0000000000 65535 f 
++0000000357 00000 n 
++trailer <<
++  /Root 2 0 R
++  /Size 8
++>>
++startxref
++434
++%%EOF
